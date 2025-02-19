@@ -11,10 +11,10 @@ const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
 
 if (!SHOPIFY_STORE_URL || !SHOPIFY_ACCESS_TOKEN) {
     console.error("❌ Ошибка: Переменные окружения SHOPIFY_STORE_URL и SHOPIFY_ACCESS_TOKEN не заданы!");
-    process.exit(1); // Остановка сервера, если нет нужных данных
+    process.exit(1);
 }
 
-// Эндпоинт для отправки уведомлений в Metafields клиента
+// Эндпоинт для отправки уведомлений
 app.post("/send-notification", async (req, res) => {
     const { customerId, title, message } = req.body;
 
@@ -29,7 +29,7 @@ app.post("/send-notification", async (req, res) => {
                 metafield: {
                     namespace: "notifications",
                     key: "messages",
-                    value: JSON.stringify({ title, message, date: new Date() }),
+                    value: JSON.stringify({ title, message, date: new Date().toISOString() }),
                     type: "json_string",
                 },
             },
@@ -37,6 +37,7 @@ app.post("/send-notification", async (req, res) => {
                 headers: {
                     "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN,
                     "Content-Type": "application/json",
+                    "Accept": "application/json", // Исправленный заголовок
                 },
             }
         );
@@ -44,14 +45,14 @@ app.post("/send-notification", async (req, res) => {
         res.json({ success: true, data: response.data });
     } catch (error) {
         console.error("❌ Ошибка при отправке уведомления:", error?.response?.data || error.message);
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             error: error?.response?.data || "Неизвестная ошибка"
         });
     }
 });
 
-// Эндпоинт для проверки, работает ли сервер
+// Тестовый эндпоинт
 app.get("/", (req, res) => {
     res.send("✅ Сервер работает!");
 });
@@ -59,4 +60,3 @@ app.get("/", (req, res) => {
 // Запуск сервера
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Сервер запущен на порту ${PORT}`));
-
