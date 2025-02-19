@@ -30,7 +30,8 @@ app.post("/send-notification", async (req, res) => {
                     namespace: "notifications",
                     key: "messages",
                     value: JSON.stringify({ title, message, date: new Date().toISOString() }),
-                    type: "json_string",
+                    type: "single_line_text_field",
+
                 },
             },
             {
