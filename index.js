@@ -41,7 +41,10 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
             try {
                 console.log("📸 Загружаем изображение в Shopify...");
                 const formData = new FormData();
-                formData.append("file", imageFile.buffer, imageFile.originalname);
+                formData.append("file", imageFile.buffer, {
+                    filename: imageFile.originalname,
+                    contentType: imageFile.mimetype
+                });
 
                 const imageResponse = await axios.post(
                     `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
