@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import axios from "axios";
+import multer from "multer";
 
 dotenv.config();
 
@@ -16,24 +17,57 @@ app.use(cors({
 
 app.use(express.json());
 
+// Настройка загрузки файлов
+const upload = multer({ storage: multer.memoryStorage() });
+
 app.get("/", (req, res) => {
     res.send("✅ Сервер работает!");
 });
 
-// 🔹 Эндпоинт: Отправка уведомления в Shopify (ТЕГИ + МЕТАФИЛДЫ)
+// 🔹 Эндпоинт: Загрузка изображений в Shopify
+app.post("/api/upload-image", upload.single("image"), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: "Файл не загружен" });
+        }
+
+        const response = await axios.post(
+            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
+            {
+                file: {
+                    attachment: req.file.buffer.toString("base64"),
+                    filename: req.file.originalname
+                }
+            },
+            {
+                headers: {
+                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+            }
+        );
+
+        res.json({ success: true, imageUrl: response.data.file.public_url });
+    } catch (error) {
+        console.error("❌ Ошибка при загрузке изображения:", error.response ? error.response.data : error.message);
+        res.status(500).json({ success: false, error: "Ошибка при загрузке изображения в Shopify" });
+    }
+});
+
+// 🔹 Эндпоинт: Отправка уведомления в Shopify
 app.post("/api/notifications/send", async (req, res) => {
     try {
-        const { customerId, title, message } = req.body;
+        const { customerId, title, message, imageUrl } = req.body;
 
         if (!customerId || !title || !message) {
-            console.error("❌ Ошибка: не хватает параметров", req.body);
             return res.status(400).json({ success: false, error: "customerId, title и message обязательны!" });
         }
 
         console.log("✅ Получен запрос на отправку уведомления:", req.body);
 
         // 🏷️ Добавляем тег в Shopify
-        const tagResponse = await axios.post(
+        await axios.put(
             `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}.json`,
             { customer: { id: customerId, tags: title } },
             {
@@ -44,8 +78,6 @@ app.post("/api/notifications/send", async (req, res) => {
                 }
             }
         );
-
-        console.log("🏷️ Тег добавлен:", tagResponse.data);
 
         // 🔹 Получаем текущие уведомления из метафилдов
         const getResponse = await axios.get(
@@ -70,9 +102,10 @@ app.post("/api/notifications/send", async (req, res) => {
         const newNotification = {
             title,
             message,
+            imageUrl,
             timestamp: new Date().toISOString()
         };
-        existingNotifications.unshift(newNotification); // Добавляем в начало списка
+        existingNotifications.unshift(newNotification);
 
         // ✏️ Записываем обратно в Shopify
         await axios.post(
@@ -94,51 +127,18 @@ app.post("/api/notifications/send", async (req, res) => {
             }
         );
 
-        console.log("📩 Уведомление записано в Shopify:", newNotification);
         res.json({ success: true, message: "Уведомление отправлено в Shopify!" });
 
     } catch (error) {
-        console.error("❌ Ошибка при отправке:", error.response ? error.response.data : error.message);
+        console.error("❌ Ошибка при отправке уведомления:", error.response ? error.response.data : error.message);
         res.status(500).json({ success: false, error: "Ошибка при отправке уведомления в Shopify" });
     }
 });
 
-// 🔹 Эндпоинт: Получение уведомлений клиента
-app.get("/api/notifications/get/:customerId", async (req, res) => {
-    try {
-        const { customerId } = req.params;
-
-        const response = await axios.get(
-            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}/metafields.json`,
-            {
-                headers: {
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                    "Accept": "application/json"
-                }
-            }
-        );
-
-        let notifications = [];
-        if (response.data.metafields) {
-            const notifMetafield = response.data.metafields.find(m => m.namespace === "notifications");
-            if (notifMetafield) {
-                notifications = JSON.parse(notifMetafield.value);
-            }
-        }
-
-        res.json({ success: true, notifications });
-
-    } catch (error) {
-        console.error("❌ Ошибка при получении уведомлений:", error.response ? error.response.data : error.message);
-        res.status(500).json({ success: false, error: "Ошибка при получении уведомлений" });
-    }
-});
-
-// 🔹 Эндпоинт: Очистка уведомлений после просмотра
-app.post("/api/notifications/clear", async (req, res) => {
+// 🔹 Эндпоинт: Удаление всех уведомлений
+app.post("/api/notifications/delete", async (req, res) => {
     try {
         const { customerId } = req.body;
-
         await axios.post(
             `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}/metafields.json`,
             {
@@ -158,12 +158,10 @@ app.post("/api/notifications/clear", async (req, res) => {
             }
         );
 
-        console.log(`🗑️ Уведомления для клиента ${customerId} очищены`);
-        res.json({ success: true, message: "Уведомления очищены" });
-
+        res.json({ success: true, message: "Все уведомления удалены" });
     } catch (error) {
-        console.error("❌ Ошибка при очистке уведомлений:", error.response ? error.response.data : error.message);
-        res.status(500).json({ success: false, error: "Ошибка при очистке уведомлений" });
+        console.error("❌ Ошибка при удалении уведомлений:", error.response ? error.response.data : error.message);
+        res.status(500).json({ success: false, error: "Ошибка при удалении уведомлений" });
     }
 });
 
