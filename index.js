@@ -17,54 +17,47 @@ app.use(cors({
 
 app.use(express.json());
 
-// Настройка загрузки файлов
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.get("/", (req, res) => {
     res.send("✅ Сервер работает!");
 });
 
-// 🔹 Эндпоинт: Загрузка изображений в Shopify
-app.post("/api/upload-image", upload.single("image"), async (req, res) => {
+// 🔹 Эндпоинт: Отправка уведомления в Shopify (ТЕГИ + МЕТАФИЛДЫ + ИЗОБРАЖЕНИЯ)
+app.post("/api/notifications/send", upload.single("image"), async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ success: false, error: "Файл не загружен" });
-        }
-
-        const response = await axios.post(
-            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
-            {
-                file: {
-                    attachment: req.file.buffer.toString("base64"),
-                    filename: req.file.originalname
-                }
-            },
-            {
-                headers: {
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                }
-            }
-        );
-
-        res.json({ success: true, imageUrl: response.data.file.public_url });
-    } catch (error) {
-        console.error("❌ Ошибка при загрузке изображения:", error.response ? error.response.data : error.message);
-        res.status(500).json({ success: false, error: "Ошибка при загрузке изображения в Shopify" });
-    }
-});
-
-// 🔹 Эндпоинт: Отправка уведомления в Shopify
-app.post("/api/notifications/send", async (req, res) => {
-    try {
-        const { customerId, title, message, imageUrl } = req.body;
+        const { customerId, title, message } = req.body;
+        const imageFile = req.file;
 
         if (!customerId || !title || !message) {
+            console.error("❌ Ошибка: не хватает параметров", req.body);
             return res.status(400).json({ success: false, error: "customerId, title и message обязательны!" });
         }
 
         console.log("✅ Получен запрос на отправку уведомления:", req.body);
+
+        let imageUrl = "";
+        if (imageFile) {
+            console.log("📸 Загружаем изображение в Shopify...");
+            const imageResponse = await axios.post(
+                `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
+                {
+                    file: {
+                        attachment: imageFile.buffer.toString("base64"),
+                        filename: imageFile.originalname
+                    }
+                },
+                {
+                    headers: {
+                        "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    }
+                }
+            );
+            imageUrl = imageResponse.data.file.public_url;
+            console.log("📸 Изображение загружено:", imageUrl);
+        }
 
         // 🏷️ Добавляем тег в Shopify
         await axios.put(
@@ -102,7 +95,7 @@ app.post("/api/notifications/send", async (req, res) => {
         const newNotification = {
             title,
             message,
-            imageUrl,
+            image: imageUrl,
             timestamp: new Date().toISOString()
         };
         existingNotifications.unshift(newNotification);
@@ -127,41 +120,11 @@ app.post("/api/notifications/send", async (req, res) => {
             }
         );
 
+        console.log("📩 Уведомление записано в Shopify:", newNotification);
         res.json({ success: true, message: "Уведомление отправлено в Shopify!" });
-
     } catch (error) {
-        console.error("❌ Ошибка при отправке уведомления:", error.response ? error.response.data : error.message);
+        console.error("❌ Ошибка при отправке:", error.response ? error.response.data : error.message);
         res.status(500).json({ success: false, error: "Ошибка при отправке уведомления в Shopify" });
-    }
-});
-
-// 🔹 Эндпоинт: Удаление всех уведомлений
-app.post("/api/notifications/delete", async (req, res) => {
-    try {
-        const { customerId } = req.body;
-        await axios.post(
-            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}/metafields.json`,
-            {
-                metafield: {
-                    namespace: "notifications",
-                    key: "messages",
-                    value: "[]", // Очищаем список
-                    type: "json_string"
-                }
-            },
-            {
-                headers: {
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                }
-            }
-        );
-
-        res.json({ success: true, message: "Все уведомления удалены" });
-    } catch (error) {
-        console.error("❌ Ошибка при удалении уведомлений:", error.response ? error.response.data : error.message);
-        res.status(500).json({ success: false, error: "Ошибка при удалении уведомлений" });
     }
 });
 
