@@ -11,14 +11,13 @@ const SHOPIFY_STORE_URL = process.env.SHOPIFY_STORE_URL;
 const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
 
 app.use(cors({
-    origin: ["https://colibri.sale"], // Разрешаем запросы с твоего домена
+    origin: ["https://colibri.sale"],
     methods: "GET,POST",
     allowedHeaders: "Content-Type,Authorization"
 }));
 
 app.use(express.json());
 
-// Тестовый маршрут для проверки сервера
 app.get("/", (req, res) => {
     res.send("✅ Сервер работает!");
 });
@@ -39,16 +38,18 @@ app.post("/api/notifications/send", async (req, res) => {
                     namespace: "notifications",
                     key: "messages",
                     value: JSON.stringify({ title, message, date: new Date().toISOString() }),
-                    type: "json_string",
+                    type: "single_line_text_field",  // 🔥 ИСПРАВЛЕНО!
                 },
             },
             {
                 headers: {
                     "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN,
                     "Content-Type": "application/json",
+                    "Accept": "application/json",
                 },
             }
         );
+
         res.json({ success: true, data: response.data });
     } catch (error) {
         console.error("❌ Ошибка при отправке уведомления в Shopify:", error?.response?.data || error.message);
