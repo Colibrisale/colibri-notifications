@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import axios from "axios";
 import multer from "multer";
-import FormData from "form-data"; // Добавляем поддержку FormData
+import FormData from "form-data";
 
 dotenv.config();
 
@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors({
     origin: ["https://colibri.sale"],
-    methods: "GET,POST",
+    methods: "GET,POST,DELETE",
     allowedHeaders: "Content-Type,Authorization"
 }));
 
@@ -70,7 +70,7 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
 
         console.log(`📩 Отправляем уведомление ${userFilter} пользователям. Всего: ${recipients.length}`);
         
-        const newNotification = { title, message, image: imageUrl, link, timestamp: new Date().toISOString() };
+        const newNotification = { id: Date.now(), title, message, image: imageUrl, link, timestamp: new Date().toISOString() };
         globalNotifications.unshift(newNotification);
 
         res.json({ success: true, message: "Уведомление отправлено!" });
@@ -83,6 +83,19 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
 // API для получения всех уведомлений
 app.get("/api/notifications", (req, res) => {
     res.json({ success: true, notifications: globalNotifications });
+});
+
+// API для удаления одного уведомления
+app.delete("/api/notifications/:id", (req, res) => {
+    const notificationId = parseInt(req.params.id);
+    globalNotifications = globalNotifications.filter(n => n.id !== notificationId);
+    res.json({ success: true, message: "Уведомление удалено!" });
+});
+
+// API для удаления всех уведомлений
+app.delete("/api/notifications/clear", (req, res) => {
+    globalNotifications = [];
+    res.json({ success: true, message: "Все уведомления удалены!" });
 });
 
 app.listen(PORT, () => {
