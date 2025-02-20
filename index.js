@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors({
     origin: ["https://colibri.sale"],
-    methods: "GET,POST,DELETE",
+    methods: "GET,POST,PUT,DELETE",
     allowedHeaders: "Content-Type,Authorization"
 }));
 
@@ -23,7 +23,24 @@ app.get("/", (req, res) => {
     res.send("✅ Сервер работает!");
 });
 
-let globalNotifications = []; // Глобальный список уведомлений
+let globalNotifications = []; // Храним все уведомления
+
+// 🔹 Эндпоинт: Получение количества непрочитанных уведомлений (для колокольчика)
+app.get("/api/notifications/unread", (req, res) => {
+    const unreadCount = globalNotifications.filter(n => !n.read).length;
+    res.json({ success: true, unread: unreadCount });
+});
+
+// 🔹 Эндпоинт: Пометить все уведомления как прочитанные
+app.put("/api/notifications/read", (req, res) => {
+    globalNotifications.forEach(n => n.read = true);
+    res.json({ success: true, message: "Все уведомления прочитаны" });
+});
+
+// 🔹 Эндпоинт: Получение всех уведомлений
+app.get("/api/notifications", (req, res) => {
+    res.json({ success: true, notifications: globalNotifications });
+});
 
 // 🔹 Эндпоинт: Отправка уведомления
 app.post("/api/notifications/send", upload.single("image"), async (req, res) => {
@@ -46,7 +63,7 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
                     {
                         headers: {
                             "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                            "Accept": "application/json", // Явно указываем ожидаемый ответ
+                            "Accept": "application/json",
                             ...formData.getHeaders(),
                         },
                     }
@@ -69,8 +86,16 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
         }
 
         console.log(`📩 Отправляем уведомление ${userFilter} пользователям. Всего: ${recipients.length}`);
-        
-        const newNotification = { id: Date.now(), title, message, image: imageUrl, link, timestamp: new Date().toISOString() };
+
+        const newNotification = { 
+            id: Date.now(), 
+            title, 
+            message, 
+            image: imageUrl, 
+            link, 
+            timestamp: new Date().toISOString(),
+            read: false // Все новые уведомления по умолчанию непрочитанные
+        };
         globalNotifications.unshift(newNotification);
 
         res.json({ success: true, message: "Уведомление отправлено!" });
@@ -80,19 +105,14 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
     }
 });
 
-// API для получения всех уведомлений
-app.get("/api/notifications", (req, res) => {
-    res.json({ success: true, notifications: globalNotifications });
-});
-
-// API для удаления одного уведомления
+// 🔹 API для удаления одного уведомления
 app.delete("/api/notifications/:id", (req, res) => {
     const notificationId = parseInt(req.params.id);
     globalNotifications = globalNotifications.filter(n => n.id !== notificationId);
     res.json({ success: true, message: "Уведомление удалено!" });
 });
 
-// API для удаления всех уведомлений
+// 🔹 API для удаления всех уведомлений
 app.delete("/api/notifications/clear", (req, res) => {
     globalNotifications = [];
     res.json({ success: true, message: "Все уведомления удалены!" });
@@ -102,7 +122,7 @@ app.listen(PORT, () => {
     console.log(`🚀 Сервер запущен на порту ${PORT}`);
 });
 
-// Функции для фильтрации пользователей
+// 🔹 Функции для фильтрации пользователей
 async function getAllUsers() {
     const response = await axios.get(`https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/customers.json`, {
         headers: { "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN }
