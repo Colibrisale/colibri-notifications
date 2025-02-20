@@ -2,6 +2,7 @@
   "name": "colibri-notifications",
   "version": "1.0.0",
   "description": "Shopify Notifications API",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
