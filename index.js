@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import axios from "axios";
 import multer from "multer";
+import FormData from "form-data"; // Добавляем поддержку FormData
 
 dotenv.config();
 
@@ -39,20 +40,17 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
         if (imageFile) {
             try {
                 console.log("📸 Загружаем изображение в Shopify...");
+                const formData = new FormData();
+                formData.append("file", imageFile.buffer, imageFile.originalname);
+
                 const imageResponse = await axios.post(
                     `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
-                    {
-                        file: {
-                            attachment: imageFile.buffer.toString("base64"),
-                            filename: imageFile.originalname
-                        }
-                    },
+                    formData,
                     {
                         headers: {
                             "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                            "Content-Type": "application/json",
-                            "Accept": "application/json"
-                        }
+                            ...formData.getHeaders(),
+                        },
                     }
                 );
                 imageUrl = imageResponse.data.file.public_url;
