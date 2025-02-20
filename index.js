@@ -37,32 +37,37 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
         console.log("✅ Получен запрос на отправку уведомления:", req.body);
 
         let imageUrl = "";
-        if (imageFile) {
-            try {
-                console.log("📸 Загружаем изображение в Shopify...");
-                const formData = new FormData();
-                formData.append("file", imageFile.buffer, {
-                    filename: imageFile.originalname,
-                    contentType: imageFile.mimetype
-                });
+       if (imageFile) {
+    try {
+        console.log("📸 Загружаем изображение в Shopify...");
 
-                const imageResponse = await axios.post(
-                    `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
-                    formData,
-                    {
-                        headers: {
-                            "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                            ...formData.getHeaders(),
-                        },
-                    }
-                );
-                imageUrl = imageResponse.data.file.public_url;
-                console.log("📸 Изображение загружено:", imageUrl);
-            } catch (err) {
-                console.error("⚠️ Полная ошибка Shopify:", err.response ? JSON.stringify(err.response.data, null, 2) : err.message);
+        const formData = new FormData();
+        formData.append("file", imageFile.buffer, {
+            filename: imageFile.originalname,
+            contentType: imageFile.mimetype
+        });
 
+        console.log("📤 Отправляем в Shopify, вот что в formData:", formData);
+
+        const imageResponse = await axios.post(
+            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
+            formData,
+            {
+                headers: {
+                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                    "Content-Type": "multipart/form-data",
+                    ...formData.getHeaders(),
+                },
             }
-        }
+        );
+
+        imageUrl = imageResponse.data.file.public_url;
+        console.log("📸 Изображение загружено:", imageUrl);
+    } catch (err) {
+        console.error("⚠️ Ошибка загрузки изображения:", err.response ? JSON.stringify(err.response.data, null, 2) : err.message);
+    }
+}
+
 
         // 🔹 Получаем текущие уведомления из метафилдов
         let existingNotifications = [];
