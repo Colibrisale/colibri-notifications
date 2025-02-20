@@ -58,8 +58,12 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
             }
         );
 
-        console.log("📩 Полный ответ от Shopify:", JSON.stringify(imageResponse.data, null, 2));
-        imageUrl = imageResponse.data.file.public_url;
+       console.log("🖼 Формат изображения:", imageFile.mimetype);
+if (!["image/jpeg", "image/png", "image/gif"].includes(imageFile.mimetype)) {
+    console.error("❌ Ошибка: Неподдерживаемый формат изображения!");
+    return res.status(400).json({ success: false, error: "Формат изображения не поддерживается!" });
+}
+
 
         console.log("📸 Изображение загружено:", imageUrl);
     } catch (err) {
