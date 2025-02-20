@@ -37,37 +37,36 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
         console.log("✅ Получен запрос на отправку уведомления:", req.body);
 
         let imageUrl = "";
-       if (imageFile) {
-    try {
-        console.log("📸 Загружаем изображение в Shopify...");
+        if (imageFile) {
+            try {
+                console.log("📸 Загружаем изображение в Shopify...");
 
-        const formData = new FormData();
-        formData.append("file", imageFile.buffer, {
-            filename: imageFile.originalname,
-            contentType: imageFile.mimetype
-        });
+                const formData = new FormData();
+                formData.append("file", imageFile.buffer, {
+                    filename: imageFile.originalname,
+                    contentType: imageFile.mimetype
+                });
 
-        console.log("📤 Отправляем в Shopify, вот что в formData:", formData);
+                console.log("📤 Отправляем в Shopify, вот что в formData:", formData);
 
-        const imageResponse = await axios.post(
-            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
-            formData,
-            {
-                headers: {
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                    "Content-Type": "multipart/form-data",
-                    ...formData.getHeaders(),
-                },
+                const imageResponse = await axios.post(
+                    `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
+                    formData,
+                    {
+                        headers: {
+                            "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                            "Content-Type": "multipart/form-data",
+                            ...formData.getHeaders(),
+                        },
+                    }
+                );
+
+                imageUrl = imageResponse.data.file.public_url;
+                console.log("📸 Изображение загружено:", imageUrl);
+            } catch (err) {
+                console.error("⚠️ Ошибка загрузки изображения:", err.response ? JSON.stringify(err.response.data, null, 2) : err.message);
             }
-        );
-
-        imageUrl = imageResponse.data.file.public_url;
-        console.log("📸 Изображение загружено:", imageUrl);
-    } catch (err) {
-        console.error("⚠️ Ошибка загрузки изображения:", err.response ? JSON.stringify(err.response.data, null, 2) : err.message);
-    }
-}
-
+        }
 
         // 🔹 Получаем текущие уведомления из метафилдов
         let existingNotifications = [];
@@ -123,7 +122,7 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
 
         res.json({ success: true, message: "Уведомление отправлено в Shopify!" });
     } catch (error) {
-        console.error("❌ Ошибка при отправке:", error.response ? error.response.data : error.message);
+        console.error("❌ Ошибка при отправке:", error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
         res.status(500).json({ success: false, error: "Ошибка при отправке уведомления в Shopify" });
     }
 });
