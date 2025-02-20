@@ -1,7 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import notificationsHandler from "./api/notifications.js"; // Подключаем новый обработчик
 
 dotenv.config();
 
@@ -16,14 +15,25 @@ app.use(cors({
 
 app.use(express.json());
 
-// Главная страница проверки сервера
+// Тестовый маршрут для проверки сервера
 app.get("/", (req, res) => {
-    res.send("Сервер работает!");
+    res.send("✅ Сервер работает!");
 });
 
-// Маршрут для отправки уведомлений в Shopify
-app.use("/api/notifications", notificationsHandler);
+// 📌 Новый маршрут для отправки уведомлений
+app.post("/api/notifications/send", (req, res) => {
+    const { customerId, title, message } = req.body;
+
+    if (!customerId || !title || !message) {
+        return res.status(400).json({ success: false, error: "customerId, title и message обязательны!" });
+    }
+
+    // Здесь можно добавить логику работы с Shopify API
+    console.log("Получен запрос на отправку уведомления:", req.body);
+
+    res.json({ success: true, message: "Уведомление отправлено!" });
+});
 
 app.listen(PORT, () => {
-    console.log(`Сервер запущен на http://localhost:${PORT}`);
+    console.log(`🚀 Сервер запущен на порту ${PORT}`);
 });
