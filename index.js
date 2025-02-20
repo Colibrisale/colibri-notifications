@@ -90,7 +90,7 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
 
         // ✏️ Записываем обратно в Shopify
         try {
-            await axios.post(
+            await axios.put(
                 `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}/metafields.json`,
                 {
                     metafield: {
