@@ -61,23 +61,6 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
             }
         }
 
-        // 🏷️ Добавляем тег в Shopify
-        try {
-            await axios.put(
-                `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}.json`,
-                { customer: { id: customerId, tags: title } },
-                {
-                    headers: {
-                        "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    }
-                }
-            );
-        } catch (err) {
-            console.error("⚠️ Ошибка при добавлении тега, продолжаем без него.", err.message);
-        }
-
         // 🔹 Получаем текущие уведомления из метафилдов
         let existingNotifications = [];
         try {
@@ -134,6 +117,41 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
     } catch (error) {
         console.error("❌ Ошибка при отправке:", error.response ? error.response.data : error.message);
         res.status(500).json({ success: false, error: "Ошибка при отправке уведомления в Shopify" });
+    }
+});
+
+// 🔹 Эндпоинт: Удаление всех уведомлений
+app.post("/api/notifications/delete", async (req, res) => {
+    try {
+        const { customerId } = req.body;
+        if (!customerId) {
+            return res.status(400).json({ success: false, error: "customerId обязателен!" });
+        }
+
+        await axios.post(
+            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}/metafields.json`,
+            {
+                metafield: {
+                    namespace: "notifications",
+                    key: "messages",
+                    value: "[]",
+                    type: "json_string"
+                }
+            },
+            {
+                headers: {
+                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+            }
+        );
+
+        console.log("🗑 Уведомления удалены.");
+        res.json({ success: true, message: "Все уведомления удалены!" });
+    } catch (error) {
+        console.error("❌ Ошибка при удалении:", error.response ? error.response.data : error.message);
+        res.status(500).json({ success: false, error: "Ошибка при удалении уведомлений" });
     }
 });
 
