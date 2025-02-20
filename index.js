@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import cors from "cors";
 import axios from "axios";
 import multer from "multer";
+import FormData from "form-data";
+import fs from "fs";
 
 dotenv.config();
 
@@ -17,7 +19,8 @@ app.use(cors({
 
 app.use(express.json());
 
-const upload = multer({ storage: multer.memoryStorage() });
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 app.get("/", (req, res) => {
     res.send("✅ Сервер работает!");
@@ -39,22 +42,21 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
         let imageUrl = "";
         if (imageFile) {
             console.log("📸 Загружаем изображение в Shopify...");
+
+            const formData = new FormData();
+            formData.append("file", imageFile.buffer, { filename: imageFile.originalname });
+
             const imageResponse = await axios.post(
                 `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
-                {
-                    file: {
-                        attachment: imageFile.buffer.toString("base64"),
-                        filename: imageFile.originalname
-                    }
-                },
+                formData,
                 {
                     headers: {
+                        ...formData.getHeaders(),
                         "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
                     }
                 }
             );
+
             imageUrl = imageResponse.data.file.public_url;
             console.log("📸 Изображение загружено:", imageUrl);
         }
