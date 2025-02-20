@@ -38,14 +38,13 @@ app.post("/api/notifications/send", async (req, res) => {
                     namespace: "notifications",
                     key: "messages",
                     value: JSON.stringify({ title, message, date: new Date().toISOString() }),
-                    type: "single_line_text_field",  // 🔥 ИСПРАВЛЕНО!
+                    type: "single_line_text_field",  // 🔥 Shopify требует `single_line_text_field`
                 },
             },
             {
                 headers: {
                     "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
+                    "Content-Type": "application/json",  // 🔥 УБРАЛ `Accept: application/json`
                 },
             }
         );
