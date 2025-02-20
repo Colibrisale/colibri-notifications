@@ -47,7 +47,7 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
         console.log("📤 Отправляем в Shopify, вот что в formData:", formData);
 
         const imageResponse = await axios.post(
-            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
+            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/files.json`,
             formData,
             {
                 headers: {
@@ -58,7 +58,9 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
             }
         );
 
+        console.log("📩 Полный ответ от Shopify:", JSON.stringify(imageResponse.data, null, 2));
         imageUrl = imageResponse.data.file.public_url;
+
         console.log("📸 Изображение загружено:", imageUrl);
     } catch (err) {
         console.error("⚠️ Ошибка загрузки изображения:", err.response ? JSON.stringify(err.response.data, null, 2) : err.message);
