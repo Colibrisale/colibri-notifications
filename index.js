@@ -139,3 +139,8 @@ async function getGuestUsers() {
     const registered = await getRegisteredUsers();
     return ["guest1@example.com", "guest2@example.com"].filter(g => !registered.includes(g));
 }
+// Эндпоинт для пометки уведомлений как прочитанных
+app.post("/api/notifications/read", (req, res) => {
+    globalNotifications.forEach(n => n.read = true);
+    res.json({ success: true, message: "Все уведомления помечены как прочитанные" });
+});
