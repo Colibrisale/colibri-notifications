@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import axios from "axios"; // Добавляем axios для отправки запросов
+import axios from "axios";
 
 dotenv.config();
 
@@ -9,7 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({
-    origin: ["https://colibri.sale"], 
+    origin: ["https://colibri.sale"],
     methods: "GET,POST",
     allowedHeaders: "Content-Type,Authorization"
 }));
@@ -23,19 +23,17 @@ app.get("/", (req, res) => {
 app.post("/api/notifications/send", async (req, res) => {
     try {
         const { customerId, title, message } = req.body;
+
         if (!customerId || !title || !message) {
-            console.error("❌ Ошибка: не хватает параметров");
+            console.error("❌ Ошибка: не хватает параметров", req.body);
             return res.status(400).json({ success: false, error: "customerId, title и message обязательны!" });
         }
 
         console.log("✅ Получен запрос на отправку уведомления:", req.body);
 
-        // Отправляем тестовый запрос в Shopify API, чтобы проверить связь
         const response = await axios.post(
             `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}/tags.json`,
-            {
-                tags: title
-            },
+            { tags: title },
             {
                 headers: {
                     "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
@@ -45,8 +43,7 @@ app.post("/api/notifications/send", async (req, res) => {
             }
         );
 
-        console.log("📩 Ответ от Shopify:", response.data);
-
+        console.log("📩 Ответ от Shopify API:", response.data);
         res.json({ success: true, message: "Уведомление отправлено в Shopify!" });
 
     } catch (error) {
