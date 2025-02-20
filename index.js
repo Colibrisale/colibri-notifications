@@ -3,8 +3,6 @@ import dotenv from "dotenv";
 import cors from "cors";
 import axios from "axios";
 import multer from "multer";
-import FormData from "form-data";
-import fs from "fs";
 
 dotenv.config();
 
@@ -18,111 +16,120 @@ app.use(cors({
 }));
 
 app.use(express.json());
-
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.get("/", (req, res) => {
     res.send("✅ Сервер работает!");
 });
 
-// 🔹 Эндпоинт: Отправка уведомления в Shopify (ТЕГИ + МЕТАФИЛДЫ + ИЗОБРАЖЕНИЯ)
+// 🔹 Эндпоинт: Отправка уведомления в Shopify
 app.post("/api/notifications/send", upload.single("image"), async (req, res) => {
     try {
-        const { customerId, title, message } = req.body;
+        const { customerId, title = "", message = "", link = "" } = req.body;
         const imageFile = req.file;
-
-        if (!customerId || !title || !message) {
-            console.error("❌ Ошибка: не хватает параметров", req.body);
-            return res.status(400).json({ success: false, error: "customerId, title и message обязательны!" });
+        
+        if (!customerId) {
+            return res.status(400).json({ success: false, error: "customerId обязателен!" });
         }
-
+        
         console.log("✅ Получен запрос на отправку уведомления:", req.body);
 
         let imageUrl = "";
         if (imageFile) {
-            console.log("📸 Загружаем изображение в Shopify...");
+            try {
+                console.log("📸 Загружаем изображение в Shopify...");
+                const imageResponse = await axios.post(
+                    `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
+                    {
+                        file: {
+                            attachment: imageFile.buffer.toString("base64"),
+                            filename: imageFile.originalname
+                        }
+                    },
+                    {
+                        headers: {
+                            "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                            "Content-Type": "application/json",
+                            "Accept": "application/json"
+                        }
+                    }
+                );
+                imageUrl = imageResponse.data.file.public_url;
+                console.log("📸 Изображение загружено:", imageUrl);
+            } catch (err) {
+                console.error("⚠️ Ошибка загрузки изображения, продолжаем без него.", err.message);
+            }
+        }
 
-            const formData = new FormData();
-            formData.append("file", imageFile.buffer, { filename: imageFile.originalname });
-
-            const imageResponse = await axios.post(
-                `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/files.json`,
-                formData,
+        // 🏷️ Добавляем тег в Shopify
+        try {
+            await axios.put(
+                `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}.json`,
+                { customer: { id: customerId, tags: title } },
                 {
                     headers: {
-                        ...formData.getHeaders(),
                         "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    }
+                }
+            );
+        } catch (err) {
+            console.error("⚠️ Ошибка при добавлении тега, продолжаем без него.", err.message);
+        }
+
+        // 🔹 Получаем текущие уведомления из метафилдов
+        let existingNotifications = [];
+        try {
+            const getResponse = await axios.get(
+                `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}/metafields.json`,
+                {
+                    headers: {
+                        "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                        "Accept": "application/json"
                     }
                 }
             );
 
-            imageUrl = imageResponse.data.file.public_url;
-            console.log("📸 Изображение загружено:", imageUrl);
-        }
-
-        // 🏷️ Добавляем тег в Shopify
-        await axios.put(
-            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}.json`,
-            { customer: { id: customerId, tags: title } },
-            {
-                headers: {
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
+            if (getResponse.data.metafields) {
+                const notifMetafield = getResponse.data.metafields.find(m => m.namespace === "notifications");
+                if (notifMetafield) {
+                    existingNotifications = JSON.parse(notifMetafield.value);
                 }
             }
-        );
-
-        // 🔹 Получаем текущие уведомления из метафилдов
-        const getResponse = await axios.get(
-            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}/metafields.json`,
-            {
-                headers: {
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                    "Accept": "application/json"
-                }
-            }
-        );
-
-        let existingNotifications = [];
-        if (getResponse.data.metafields) {
-            const notifMetafield = getResponse.data.metafields.find(m => m.namespace === "notifications");
-            if (notifMetafield) {
-                existingNotifications = JSON.parse(notifMetafield.value);
-            }
+        } catch (err) {
+            console.error("⚠️ Ошибка получения метафилдов, продолжаем без них.", err.message);
         }
 
         // 🆕 Добавляем новое уведомление
-        const newNotification = {
-            title,
-            message,
-            image: imageUrl,
-            timestamp: new Date().toISOString()
-        };
+        const newNotification = { title, message, image: imageUrl, link, timestamp: new Date().toISOString() };
         existingNotifications.unshift(newNotification);
 
         // ✏️ Записываем обратно в Shopify
-        await axios.post(
-            `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}/metafields.json`,
-            {
-                metafield: {
-                    namespace: "notifications",
-                    key: "messages",
-                    value: JSON.stringify(existingNotifications),
-                    type: "json_string"
+        try {
+            await axios.post(
+                `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}/metafields.json`,
+                {
+                    metafield: {
+                        namespace: "notifications",
+                        key: "messages",
+                        value: JSON.stringify(existingNotifications),
+                        type: "json_string"
+                    }
+                },
+                {
+                    headers: {
+                        "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    }
                 }
-            },
-            {
-                headers: {
-                    "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                }
-            }
-        );
+            );
+            console.log("📩 Уведомление записано в Shopify:", newNotification);
+        } catch (err) {
+            console.error("⚠️ Ошибка записи уведомления, но продолжаем.", err.message);
+        }
 
-        console.log("📩 Уведомление записано в Shopify:", newNotification);
         res.json({ success: true, message: "Уведомление отправлено в Shopify!" });
     } catch (error) {
         console.error("❌ Ошибка при отправке:", error.response ? error.response.data : error.message);
