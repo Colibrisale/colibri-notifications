@@ -25,8 +25,12 @@ app.get("/", (req, res) => {
 // 🔹 Эндпоинт: Отправка уведомления в Shopify
 app.post("/api/notifications/send", upload.single("image"), async (req, res) => {
     try {
-        const { customerId = "default", title = "", message = "", link = "" } = req.body;
+        const { customerId, title = "", message = "", link = "" } = req.body;
         const imageFile = req.file;
+        
+        if (!customerId) {
+            return res.status(400).json({ success: false, error: "customerId обязателен!" });
+        }
         
         console.log("✅ Получен запрос на отправку уведомления:", req.body);
 
@@ -113,6 +117,24 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
     } catch (error) {
         console.error("❌ Ошибка при отправке:", error.response ? error.response.data : error.message);
         res.status(500).json({ success: false, error: "Ошибка при отправке уведомления в Shopify" });
+    }
+});
+
+// 🔹 Эндпоинт: Приветственное уведомление
+app.post("/api/notifications/welcome", async (req, res) => {
+    try {
+        const { customerId, title = "Добро пожаловать!", message = "Спасибо за регистрацию!" } = req.body;
+        
+        if (!customerId) {
+            return res.status(400).json({ success: false, error: "customerId обязателен!" });
+        }
+
+        console.log("✅ Отправка приветственного уведомления:", { customerId, title, message });
+
+        res.json({ success: true, message: "Приветственное уведомление отправлено!" });
+    } catch (error) {
+        console.error("❌ Ошибка при отправке приветственного уведомления:", error.message);
+        res.status(500).json({ success: false, error: "Ошибка при отправке приветственного уведомления" });
     }
 });
 
