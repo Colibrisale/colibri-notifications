@@ -25,12 +25,8 @@ app.get("/", (req, res) => {
 // 🔹 Эндпоинт: Отправка уведомления в Shopify
 app.post("/api/notifications/send", upload.single("image"), async (req, res) => {
     try {
-        const { customerId, title = "", message = "", link = "" } = req.body;
+        const { customerId = "default", title = "", message = "", link = "" } = req.body;
         const imageFile = req.file;
-        
-        if (!customerId) {
-            return res.status(400).json({ success: false, error: "customerId обязателен!" });
-        }
         
         console.log("✅ Получен запрос на отправку уведомления:", req.body);
 
@@ -59,23 +55,6 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
             } catch (err) {
                 console.error("⚠️ Ошибка загрузки изображения, продолжаем без него.", err.message);
             }
-        }
-
-        // 🏷️ Добавляем тег в Shopify
-        try {
-            await axios.put(
-                `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2023-10/customers/${customerId}.json`,
-                { customer: { id: customerId, tags: title } },
-                {
-                    headers: {
-                        "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    }
-                }
-            );
-        } catch (err) {
-            console.error("⚠️ Ошибка при добавлении тега, продолжаем без него.", err.message);
         }
 
         // 🔹 Получаем текущие уведомления из метафилдов
