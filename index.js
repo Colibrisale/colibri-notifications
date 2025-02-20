@@ -59,7 +59,8 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
                 imageUrl = imageResponse.data.file.public_url;
                 console.log("📸 Изображение загружено:", imageUrl);
             } catch (err) {
-                console.error("⚠️ Ошибка загрузки изображения, продолжаем без него.", err.message);
+                console.error("⚠️ Полная ошибка Shopify:", err.response ? JSON.stringify(err.response.data, null, 2) : err.message);
+
             }
         }
 
