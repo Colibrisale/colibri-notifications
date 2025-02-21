@@ -160,3 +160,4 @@ app.post("/api/notifications/read", (req, res) => {
     res.json({ success: true, message: "Все уведомления помечены как прочитанные" });
 });
 
+
