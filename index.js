@@ -62,32 +62,47 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
         const imageFile = req.file;
         let imageUrl = "";
 
-        if (imageFile) {
-            try {
-                console.log("📸 Загружаем изображение в Google Cloud Storage...");
-                const fileName = `${Date.now()}_${imageFile.originalname}`;
-                const bucket = storage.bucket(bucketName);
-                const file = bucket.file(fileName);
-                const stream = file.createWriteStream({
-                    metadata: {
-                        contentType: imageFile.mimetype,
-                    },
-                });
+if (imageFile) {
+    try {
+        console.log("📸 Загружаем изображение в Google Cloud Storage...");
+        const fileName = `${Date.now()}_${imageFile.originalname}`;
+        const bucket = storage.bucket(bucketName);
+        const file = bucket.file(fileName);
 
-                stream.end(imageFile.buffer);
-                await new Promise((resolve, reject) => {
-                    stream.on("finish", resolve);
-                    stream.on("error", reject);
-                });
+        // Запись файла в облако с правильными метаданными
+        await new Promise((resolve, reject) => {
+            const stream = file.createWriteStream({
+                metadata: {
+                    contentType: imageFile.mimetype,
+                },
+                resumable: false, // ВАЖНО: Отключаем возобновляемую загрузку
+            });
 
-                // Получаем публичную ссылку
-                await file.makePublic();
-                imageUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
-                console.log("📸 Изображение загружено:", imageUrl);
-            } catch (err) {
-                console.error("⚠️ Ошибка загрузки изображения в GCS:", err.message);
-            }
-        }
+            stream.on("error", (err) => {
+                console.error("⚠️ Ошибка при загрузке в GCS:", err.message);
+                reject(err);
+            });
+
+            stream.on("finish", async () => {
+                try {
+                    // Делаем файл публичным
+                    await file.makePublic();
+                    imageUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+                    console.log("✅ Файл загружен успешно:", imageUrl);
+                    resolve();
+                } catch (err) {
+                    console.error("⚠️ Ошибка при установке публичного доступа:", err.message);
+                    reject(err);
+                }
+            });
+
+            stream.end(imageFile.buffer);
+        });
+    } catch (err) {
+        console.error("⚠️ Ошибка загрузки изображения в GCS:", err.message);
+    }
+}
+
 
         // Фильтруем пользователей по выбору в админке
         let recipients = [];
