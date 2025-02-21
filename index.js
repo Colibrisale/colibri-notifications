@@ -62,47 +62,47 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
         const imageFile = req.file;
         let imageUrl = "";
 
-if (imageFile) {
-    try {
-        console.log("📸 Загружаем изображение в Google Cloud Storage...");
-        const fileName = `${Date.now()}_${imageFile.originalname}`;
-        const bucket = storage.bucket(bucketName);
-        const file = bucket.file(fileName);
+        // Обработка изображения
+        if (imageFile) {
+            try {
+                console.log("📸 Загружаем изображение в Google Cloud Storage...");
+                const fileName = `${Date.now()}_${imageFile.originalname}`;
+                const bucket = storage.bucket(bucketName);
+                const file = bucket.file(fileName);
 
-        // Запись файла в облако с правильными метаданными
-        await new Promise((resolve, reject) => {
-            const stream = file.createWriteStream({
-                metadata: {
-                    contentType: imageFile.mimetype,
-                },
-                resumable: false, // ВАЖНО: Отключаем возобновляемую загрузку
-            });
+                // Запись файла в облако с правильными метаданными
+                await new Promise((resolve, reject) => {
+                    const stream = file.createWriteStream({
+                        metadata: {
+                            contentType: imageFile.mimetype,
+                        },
+                        resumable: false, // Важно: отключаем возобновляемую загрузку
+                    });
 
-            stream.on("error", (err) => {
-                console.error("⚠️ Ошибка при загрузке в GCS:", err.message);
-                reject(err);
-            });
+                    stream.on("error", (err) => {
+                        console.error("⚠️ Ошибка при загрузке в GCS:", err.message);
+                        reject(err);
+                    });
 
-            stream.on("finish", async () => {
-                try {
-                    // Делаем файл публичным
-                    await file.makePublic();
-                    imageUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
-                    console.log("✅ Файл загружен успешно:", imageUrl);
-                    resolve();
-                } catch (err) {
-                    console.error("⚠️ Ошибка при установке публичного доступа:", err.message);
-                    reject(err);
-                }
-            });
+                    stream.on("finish", async () => {
+                        try {
+                            // Делаем файл публичным
+                            await file.makePublic();
+                            imageUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+                            console.log("✅ Файл загружен успешно:", imageUrl);
+                            resolve();
+                        } catch (err) {
+                            console.error("⚠️ Ошибка при установке публичного доступа:", err.message);
+                            reject(err);
+                        }
+                    });
 
-            stream.end(imageFile.buffer);
-        });
-    } catch (err) {
-        console.error("⚠️ Ошибка загрузки изображения в GCS:", err.message);
-    }
-}
-
+                    stream.end(imageFile.buffer);
+                });
+            } catch (err) {
+                console.error("⚠️ Ошибка загрузки изображения в GCS:", err.message);
+            }
+        }
 
         // Фильтруем пользователей по выбору в админке
         let recipients = [];
@@ -116,15 +116,18 @@ if (imageFile) {
 
         console.log(`📩 Отправляем уведомление ${userFilter} пользователям. Всего: ${recipients.length}`);
 
+        // Создаем новое уведомление
         const newNotification = { 
             id: Date.now(), 
             title, 
             message, 
             image: imageUrl, 
-            link, 
+            link,  // Сохраняем ссылку
             timestamp: new Date().toISOString(),
             read: false
         };
+
+        // Добавляем уведомление в массив
         globalNotifications.unshift(newNotification);
 
         res.json({ success: true, message: "Уведомление отправлено!" });
@@ -174,5 +177,3 @@ app.post("/api/notifications/read", (req, res) => {
     globalNotifications.forEach(n => n.read = true);
     res.json({ success: true, message: "Все уведомления помечены как прочитанные" });
 });
-
-
