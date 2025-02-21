@@ -3,13 +3,26 @@ import dotenv from "dotenv";
 import cors from "cors";
 import axios from "axios";
 import multer from "multer";
+import { Storage } from "@google-cloud/storage";
 import FormData from "form-data";
+import path from "path";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Подключение Google Cloud Storage
+const storage = new Storage({
+    projectId: process.env.GOOGLE_PROJECT_ID,
+    credentials: {
+        client_email: process.env.GOOGLE_CLIENT_EMAIL,
+        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    },
+});
+const bucketName = "colibri-notifications";
+
+// Настройка CORS
 app.use(cors({
     origin: ["https://colibri.sale"],
     methods: "GET,POST,PUT,DELETE",
@@ -25,7 +38,7 @@ app.get("/", (req, res) => {
 
 let globalNotifications = []; // Храним все уведомления
 
-// 🔹 Эндпоинт: Получение количества непрочитанных уведомлений (для колокольчика)
+// 🔹 Эндпоинт: Получение количества непрочитанных уведомлений
 app.get("/api/notifications/unread", (req, res) => {
     const unreadCount = globalNotifications.filter(n => !n.read).length;
     res.json({ success: true, unread: unreadCount });
@@ -51,27 +64,28 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
 
         if (imageFile) {
             try {
-                console.log("📸 Загружаем изображение в Shopify...");
-                const formData = new FormData();
-                formData.append("file", imageFile.buffer, imageFile.originalname);
+                console.log("📸 Загружаем изображение в Google Cloud Storage...");
+                const fileName = `${Date.now()}_${imageFile.originalname}`;
+                const bucket = storage.bucket(bucketName);
+                const file = bucket.file(fileName);
+                const stream = file.createWriteStream({
+                    metadata: {
+                        contentType: imageFile.mimetype,
+                    },
+                });
 
-                console.log("📤 Отправляем в Shopify, вот что в formData:", formData);
+                stream.end(imageFile.buffer);
+                await new Promise((resolve, reject) => {
+                    stream.on("finish", resolve);
+                    stream.on("error", reject);
+                });
 
-                const imageResponse = await axios.post(
-                    `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/files.json`,
-                    formData,
-                    {
-                        headers: {
-                            "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-                            "Accept": "application/json",
-                            ...formData.getHeaders(),
-                        },
-                    }
-                );
-                imageUrl = imageResponse.data.file.public_url;
+                // Получаем публичную ссылку
+                await file.makePublic();
+                imageUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
                 console.log("📸 Изображение загружено:", imageUrl);
             } catch (err) {
-                console.error("⚠️ Ошибка загрузки изображения:", err.response ? JSON.stringify(err.response.data, null, 2) : err.message);
+                console.error("⚠️ Ошибка загрузки изображения в GCS:", err.message);
             }
         }
 
@@ -94,13 +108,13 @@ app.post("/api/notifications/send", upload.single("image"), async (req, res) => 
             image: imageUrl, 
             link, 
             timestamp: new Date().toISOString(),
-            read: false // Все новые уведомления по умолчанию непрочитанные
+            read: false
         };
         globalNotifications.unshift(newNotification);
 
         res.json({ success: true, message: "Уведомление отправлено!" });
     } catch (error) {
-        console.error("❌ Ошибка при отправке:", error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
+        console.error("❌ Ошибка при отправке:", error.message);
         res.status(500).json({ success: false, error: "Ошибка при отправке уведомления" });
     }
 });
@@ -139,8 +153,10 @@ async function getGuestUsers() {
     const registered = await getRegisteredUsers();
     return ["guest1@example.com", "guest2@example.com"].filter(g => !registered.includes(g));
 }
-// Эндпоинт для пометки уведомлений как прочитанных
+
+// 🔹 Эндпоинт для пометки уведомлений как прочитанных
 app.post("/api/notifications/read", (req, res) => {
     globalNotifications.forEach(n => n.read = true);
     res.json({ success: true, message: "Все уведомления помечены как прочитанные" });
 });
+
