@@ -28,5 +28,5 @@ app.get("/api/check-customer", async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+// 🔹 Добавляем экспорт
+export default app;
