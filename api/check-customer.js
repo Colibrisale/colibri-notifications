@@ -1,9 +1,13 @@
-const express = require("express");
-const axios = require("axios");
+import express from "express";
+import axios from "axios";
+import dotenv from "dotenv";
+
+dotenv.config(); // Загружаем переменные окружения
 
 const app = express();
 app.use(express.json());
 
+// ❗ БЕРЁМ ДАННЫЕ ИЗ ОКРУЖЕНИЯ
 const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN; 
 const SHOPIFY_STORE_URL = process.env.SHOPIFY_STORE_URL;
 
