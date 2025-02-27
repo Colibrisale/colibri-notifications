@@ -30,6 +30,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+const upload = multer({ storage: multer.memoryStorage() });
 
 // 🔹 Подключаем API проверки пользователей
 import checkCustomerRoutes from "./api/check-customer.js";
