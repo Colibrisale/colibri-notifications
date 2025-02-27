@@ -1,0 +1,28 @@
+const express = require("express");
+const axios = require("axios");
+
+const app = express();
+app.use(express.json());
+
+const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN; 
+const SHOPIFY_STORE_URL = process.env.SHOPIFY_STORE_URL;
+
+app.get("/api/check-customer", async (req, res) => {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: "Missing email" });
+
+    try {
+        const response = await axios.get(`https://${SHOPIFY_STORE_URL}/admin/api/2023-10/customers.json?email=${encodeURIComponent(email)}`, {
+            headers: { "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN }
+        });
+
+        const isRegistered = response.data.customers.length > 0;
+        res.json({ registered: isRegistered });
+    } catch (error) {
+        console.error("Error fetching Shopify customer:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
